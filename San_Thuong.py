@@ -65,9 +65,9 @@ try:
     required_cols = [
         "Center",
         "Office",
-        "Nhan_vien",
-        "Tuyen",
-        "Thu",
+        "IDnhanvien",
+        "Tên nhân viên",
+        "Tuyến thứ",
         "Shop",
         "Luy_ke",
         "Moc_thuong",
