@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import calendar
 
-# 1. CẤU HÌNH MOBILE FIRST & NÉN KHÔNG GIAN
+# 1. CẤU HÌNH MOBILE FIRST & NÉN KHÔNG GIAN GIAO DIỆN
 st.set_page_config(page_title="Trợ Lý Săn Thưởng Lũy Tiến", layout="centered")
 
 st.markdown("""
@@ -54,7 +54,7 @@ try:
     df_sheet = pd.read_csv(csv_url)
     df_sheet.columns = df_sheet.columns.str.strip()
     
-    # Chuẩn hóa cột ID nhân viên thành dạng chuỗi text thuần túy
+    # Chuẩn hóa cột ID nhân viên thành dạng chuỗi text thuần túy để tránh lỗi drop-down số
     if "IDnhanvien" in df_sheet.columns:
         df_sheet["IDnhanvien"] = df_sheet["IDnhanvien"].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         
@@ -95,12 +95,13 @@ if not df_sheet.empty:
         selected_office = st.selectbox("2. Chọn Office:", office_list)
         df_filtered = df_filtered[df_filtered["Office"] == selected_office]
         
-    # 3. Chọn Nhân viên (LỌC HOÀN TOÀN THEO IDnhanvien)
+    # 3. Chọn Nhân viên (Lọc chuẩn 100% dựa vào IDnhanvien)
     if "IDnhanvien" in df_filtered.columns:
         nv_id_list = sorted(df_filtered["IDnhanvien"].dropna().unique())
         selected_nv_id = st.selectbox("3. Chọn Mã nhân viên (ID):", nv_id_list)
         df_filtered = df_filtered[df_filtered["IDnhanvien"] == selected_nv_id]
         
+        # Hiển thị nhỏ tên nhân viên tương ứng bên dưới để Sales tiện nhìn nhận diện
         if "Tên nhân viên" in df_filtered.columns and not df_filtered.empty:
             ten_nv_hien_tai = df_filtered["Tên nhân viên"].iloc[0]
             st.info(f"👨‍💼 Nhân viên: **{ten_nv_hien_tai}**")
@@ -132,7 +133,7 @@ if not df_sheet.empty:
                 "tiens": [int(row.get(f"Tiền Thưởng mốc {i}", 0)) for i in range(1, 6)]
             }
 
-# --- GIAO DIỆN NHẬP ĐƠN HÀNG ---
+# --- ⚙️ GIAO DIỆN NHẬP ĐƠN HÀNG BIẾN ĐỘNG ---
 col_s1, col_s2 = st.columns(2)
 with col_s1:
     current_accumulated = st.number_input("Doanh số đã mua lũy kế (Đ):", min_value=0, value=store_data["luy_ke"], step=100000)
@@ -150,7 +151,7 @@ if selected_store == "[Tùy chỉnh nhập tay bên dưới]":
         with col2: tiens[i-1] = st.number_input(f"Tiền thưởng {i} (Đ):", min_value=0, value=i*100000, step=50000)
     st.markdown("</details>", unsafe_allow_html=True)
 
-# --- 🧠 LOGIC XỬ LÝ LŨY TIẾN ---
+# --- 🧠 LOGIC XỬ LÝ LŨY TIẾN ĐỘNG TÌM MỐC KẾ TIẾP ---
 total_revenue = current_accumulated + today_order_value
 
 def evaluate_reward(revenue, mocs, tiens):
@@ -172,12 +173,12 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 MỚI BỔ SUNG: BẢNG CƠ CẤU MỐC THƯỞNG CỦA SHOP ---
+# --- 📋 BẢNG CƠ CẤU MỐC THƯỞNG CỦA SHOP (Đã bọc thẻ HTML Table chuẩn hóa) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
 table_rows = ""
 for i in range(5):
-    # Đánh dấu highlight dòng mốc thưởng tiếp theo mà nhân viên cần đạt tới
+    # Highlight mốc tiếp theo đang cần nhắm tới để nhân viên dễ theo dõi số tiền cần bán
     is_next_target = (next_level == (i + 1))
     row_bg = "#fffde7" if is_next_target else ("#f9f9f9" if i % 2 == 0 else "#ffffff")
     row_weight = "bold" if is_next_target else "normal"
@@ -185,26 +186,29 @@ for i in range(5):
     
     table_rows += f"""
     <tr style="background-color: {row_bg}; font-weight: {row_weight}; border-bottom: 1px solid #e0e0e0;">
-        <td style="padding: 6px; font-size: 0.8rem; color: #333;">{target_star}Mốc {i+1}</td>
-        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #1565c0;">{mocs[i]:,.0f} Đ</td>
-        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #2e7d32;">+{tiens[i]:,.0f} Đ</td>
+        <td style="padding: 6px; font-size: 0.8rem; color: #333; border: none;">{target_star}Mốc {i+1}</td>
+        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #1565c0; border: none;">{mocs[i]:,.0f} Đ</td>
+        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #2e7d32; border: none;">+{tiens[i]:,.0f} Đ</td>
     </tr>
     """
 
 mocs_table_html = f"""
-<table style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; font-family: sans-serif; margin-bottom: 10px;">
-    <tr style="background-color: #f5f5f5; border-bottom: 2px solid #e0e0e0; font-weight: bold;">
-        <td style="padding: 6px; font-size: 0.8rem; color: #555;">Bậc thưởng</td>
-        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #555;">Doanh số yêu cầu</td>
-        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #555;">Tiền thưởng nhận</td>
-    </tr>
-    {table_rows}
+<table style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; font-family: sans-serif; margin-bottom: 15px;">
+    <thead>
+        <tr style="background-color: #f5f5f5; border-bottom: 2px solid #e0e0e0; font-weight: bold;">
+            <th style="padding: 6px; font-size: 0.8rem; color: #555; text-align: left;">Bậc thưởng</th>
+            <th style="padding: 6px; text-align: right; font-size: 0.8rem; color: #555;">Doanh số yêu cầu</th>
+            <th style="padding: 6px; text-align: right; font-size: 0.8rem; color: #555;">Tiền thưởng nhận</th>
+        </tr>
+    </thead>
+    <tbody>
+        {table_rows}
+    </tbody>
 </table>
 """
 st.markdown(mocs_table_html, unsafe_allow_html=True)
 
-
-# --- 📊 HIỂN THỊ KẾT QUẢ ĐÒN BẨY & THÔNG BÁO ---
+# --- 📊 HIỂN THỊ TIẾN ĐỘ VÀ KẾ HOẠCH ĐÒN BẨY SĂN THƯỞNG ---
 st.markdown("<div class='section-title'>📊 Kế hoạch đòn bẩy & Nhắc mốc săn thưởng:</div>", unsafe_allow_html=True)
 
 max_target_moc = next_moc if next_moc else mocs[-1]
@@ -212,7 +216,9 @@ pct_progress = min(1.0, total_revenue / max_target_moc) if max_target_moc > 0 el
 st.caption(f"Tiến độ tổng tích lũy tháng: {total_revenue:,.0f} Đ / {max_target_moc:,.0f} Đ")
 st.progress(pct_progress)
 
+# Hiển thị cấu trúc HTML phản hồi Real-time sinh động
 if after_reward == 0:
+    # Trường hợp chưa chạm chân vào mốc thưởng nào
     status_html = f"""
     <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.82rem; line-height: 1.5;">
         <div style="text-align: center; font-weight: bold; color: {time_color}; font-size: 0.95rem; margin-bottom: 6px; background-color: #ffeb3b; padding: 4px; border-radius: 4px;">{time_warning_text}</div>
@@ -225,18 +231,21 @@ if after_reward == 0:
     </div>
     """
 else:
+    # Trường hợp đã giật được mốc và đang nằm giữa các khoảng mốc thưởng lũy tiến kế tiếp
     status_html = f"""
     <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.82rem; line-height: 1.5;">
         <div style="text-align: center; font-weight: bold; color: #1b5e20; font-size: 0.95rem; margin-bottom: 6px; background-color: #c8e6c9; padding: 4px; border-radius: 4px;">🎉 ĐÃ KHÓA THÀNH CÔNG MỐC THƯỞNG {after_level}</div>
         <table style="width:100%; border-collapse: collapse; margin-bottom: 6px;">
             <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">💰 <b>Tiền thưởng đút túi:</b></td><td style="text-align: right; font-weight: bold; color: #2e7d32; font-size: 0.95rem;">+{after_reward:,.0f} VNĐ</td></tr>
             <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">🛒 Tổng tích lũy sau đơn:</td><td style="text-align: right; font-weight: bold; color: #333;">{total_revenue:,.0f} Đ</td></tr>
-            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">📉 Vốn thực tế của đơn hôm nay:</td><td style="text-align: right; font-weight: bold; color: #1565c0;">{max(0, today_order_value - (after_reward - curr_reward)):,.0f} Đ</td></tr>
+            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0; color: #1565c0;">📉 Vốn thực tế của đơn hôm nay:</td><td style="text-align: right; font-weight: bold; color: #1565c0;">{max(0, today_order_value - (after_reward - curr_reward)):,.0f} Đ</td></tr>
         </table>
         <div style="background-color: #1b5e20; color: white; border-radius: 5px; padding: 4px; text-align: center; font-weight: bold; font-size: 0.8rem; margin-bottom: 8px;">
             🔥 ĐỒN BẨY GIẢM GIÁ NGẦM ĐƠN HÔM NAY: {effective_discount:.1f}%
         </div>
     """
+    
+    # Nếu còn mốc lớn hơn ở phía trước thì hiển thị khung nhắc nhở kích cầu số tiền thiếu lên mốc trên
     if next_level:
         status_html += f"""
         <div style="background-color: #fffde7; border: 1px solid #fff59d; border-radius: 6px; padding: 8px; margin-top: 5px;">
@@ -257,6 +266,7 @@ else:
 
 st.markdown(status_html, unsafe_allow_html=True)
 
+# 6. ĐĂNG XUẤT HỆ THỐNG
 st.write("")
 if st.button("Đăng xuất ✖️", use_container_width=True):
     st.session_state.logged_in = False
