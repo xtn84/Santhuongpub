@@ -8,9 +8,9 @@ st.set_page_config(page_title="Trợ Lý Săn Thưởng Lũy Tiến", layout="ce
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 1.8rem !important; padding-bottom: 0.4rem !important; }
-    div[data-testid="stVerticalBlock"] > div { padding-top: 0.1rem !important; padding-bottom: 0.1rem !important; }
-    .section-title { font-size: 0.85rem !important; font-weight: bold; margin-top: 8px !important; margin-bottom: 4px !important; color: #444; }
+    .block-container { padding-top: 1.0rem !important; padding-bottom: 0.4rem !important; }
+    div[data-testid="stVerticalBlock"] > div { padding-top: 0.05rem !important; padding-bottom: 0.05rem !important; }
+    .section-title { font-size: 0.85rem !important; font-weight: bold; margin-top: 6px !important; margin-bottom: 2px !important; color: #444; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -139,12 +139,19 @@ with col_s2:
 mocs = store_data["mocs"]
 tiens = store_data["tiens"]
 
+# Sửa giá trị khởi tạo mặc định khi chọn Nhập tay
 if selected_store == "[Tùy chỉnh nhập tay bên dưới]":
     st.markdown("<details><summary>🛠️ Cấu hình nhanh 5 mức thưởng (Nhấp để mở)</summary>", unsafe_allow_html=True)
+    # Quy định mặc định cụ thể cho từng mốc để tránh nhân chuỗi sai lệch mốc 4 và mốc 5
+    default_mocs = [5000000, 10000000, 15000000, 20000000, 25000000]
+    default_tiens = [100000, 200000, 300000, 400000, 500000]
+    
     for i in range(1, 6):
         col1, col2 = st.columns(2)
-        with col1: mocs[i-1] = st.number_input(f"Mốc {i} (Đ):", min_value=0, value=i*5000000, step=500000)
-        with col2: tiens[i-1] = st.number_input(f"Tiền thưởng {i} (Đ):", min_value=0, value=i*100000, step=50000)
+        with col1: 
+            mocs[i-1] = st.number_input(f"Mốc {i} (Đ):", min_value=0, value=default_mocs[i-1], step=500000)
+        with col2: 
+            tiens[i-1] = st.number_input(f"Tiền thưởng {i} (Đ):", min_value=0, value=default_tiens[i-1], step=50000)
     st.markdown("</details>", unsafe_allow_html=True)
 
 # --- 🧠 LOGIC XỬ LÝ LŨY TIẾN ---
@@ -169,30 +176,46 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 KHỐI 1: BẢNG CƠ CẤU MỐC THƯỞNG GỌN NHẸ (Thay bằng st.dataframe - Không bao giờ lỗi) ---
+# --- 📋 KHỐI 1: BẢNG HTML CO HẸP DÒNG TUYỆT ĐỐI (Padding 2px, line-height 1) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
-# Tạo dữ liệu bảng thuần túy dưới dạng Dataframe
-df_mocs_display = pd.DataFrame({
-    "Bậc": [f"Mốc {i+1}" for i in range(5)],
-    "Doanh số": mocs,
-    "Tiền thưởng": tiens
-})
+table_rows_list = []
+for i in range(5):
+    is_next_target = (next_level == (i + 1))
+    row_bg = "#fffde7" if is_next_target else ("#f9f9f9" if i % 2 == 0 else "#ffffff")
+    row_weight = "bold" if is_next_target else "normal"
+    target_star = "🎯 " if is_next_target else ""
+    
+    moc_str = f"{mocs[i]:,.0f} Đ"
+    tien_str = f"+{tiens[i]:,.0f} Đ"
+    
+    # Thêm line-height: 1 và giảm tối đa khoảng cách dòng tr
+    row_html = f"""
+    <tr style="background-color: {row_bg}; font-weight: {row_weight}; line-height: 1;">
+        <td style="padding: 2px 4px; font-size: 0.75rem; color: #333; border: 1px solid #eeeeee;">{target_star}Mốc {i+1}</td>
+        <td style="padding: 2px 4px; text-align: right; font-size: 0.75rem; color: #1565c0; border: 1px solid #eeeeee;">{moc_str}</td>
+        <td style="padding: 2px 4px; text-align: right; font-size: 0.75rem; color: #2e7d32; border: 1px solid #eeeeee;">{tien_str}</td>
+    </tr>
+    """
+    table_rows_list.append(row_html)
 
-# Đánh dấu thêm mục tiêu nếu có mốc tiếp theo
-if next_level and next_level <= 5:
-    df_mocs_display.iloc[next_level-1, 0] = f"🎯 Mốc {next_level}"
+all_rows_content = "".join(table_rows_list)
 
-# Hiển thị bảng nhỏ xinh bằng tính năng gốc của Streamlit, tự động căn lề và định dạng số phân tách hàng nghìn
-st.dataframe(
-    df_mocs_display,
-    column_config={
-        "Doanh số": st.column_config.NumberColumn(format="%d Đ"),
-        "Tiền thưởng": st.column_config.NumberColumn(format="+%d Đ")
-    },
-    hide_index=True,
-    use_container_width=True
-)
+full_table_html = f"""
+<table style="width:100%; border-collapse: collapse; font-family: sans-serif; margin-bottom: 2px;">
+    <thead>
+        <tr style="background-color: #f1f1f1; font-weight: bold; line-height: 1;">
+            <th style="padding: 3px 4px; font-size: 0.75rem; color: #444; text-align: left; border: 1px solid #dddddd;">Mốc</th>
+            <th style="padding: 3px 4px; text-align: right; font-size: 0.75rem; color: #444; border: 1px solid #dddddd;">Doanh số</th>
+            <th style="padding: 3px 4px; text-align: right; font-size: 0.75rem; color: #444; border: 1px solid #dddddd;">Thưởng</th>
+        </tr>
+    </thead>
+    <tbody>
+        {all_rows_content}
+    </tbody>
+</table>
+"""
+st.markdown(full_table_html, unsafe_allow_html=True)
 
 # --- 📊 KHỐI 2: TIẾN ĐỘ THÁNG & KHUNG ĐÒN BẨY THÔNG BÁO ---
 st.markdown("<div class='section-title'>📊 Kế hoạch đòn bẩy & Nhắc mốc săn thưởng:</div>", unsafe_allow_html=True)
@@ -206,43 +229,43 @@ st.progress(pct_progress)
 kich_cau_html = ""
 if next_level:
     kich_cau_html = f"""
-    <div style="background-color: #fffde7; border: 1px solid #fff59d; border-radius: 6px; padding: 6px; margin-top: 6px;">
-        <div style="color: #f57f17; font-weight: bold; text-align: center; margin-bottom: 4px; font-size: 0.8rem;">🚀 CHIÊU KÍCH ĐƠN: LÊN MỐC {next_level}</div>
+    <div style="background-color: #fffde7; border: 1px solid #fff59d; border-radius: 6px; padding: 4px; margin-top: 4px;">
+        <div style="color: #f57f17; font-weight: bold; text-align: center; margin-bottom: 2px; font-size: 0.8rem;">🚀 CHIÊU KÍCH ĐƠN: LÊN MỐC {next_level}</div>
         <table style="width:100%; font-size: 0.75rem; border-collapse: collapse;">
-            <tr><td style="color:#555; padding: 2px 0; border: none;">➕ Chỉ cần cố thêm:</td><td style="text-align: right; font-weight: bold; color: #d32f2f; padding: 2px 0; border: none;">{gap_to_next:,.0f} Đ nữa</td></tr>
-            <tr><td style="color:#555; padding: 2px 0; border: none;">🎁 Tiền thưởng tăng thêm:</td><td style="text-align: right; font-weight: bold; color: #2e7d32; padding: 2px 0; border: none;">+{reward_diff:,.0f} Đ (Tổng nhận: {next_reward:,.0f} Đ)</td></tr>
+            <tr><td style="color:#555; padding: 1px 0; border: none;">➕ Chỉ cần cố thêm:</td><td style="text-align: right; font-weight: bold; color: #d32f2f; padding: 1px 0; border: none;">{gap_to_next:,.0f} Đ nữa</td></tr>
+            <tr><td style="color:#555; padding: 1px 0; border: none;">🎁 Tiền thưởng tăng thêm:</td><td style="text-align: right; font-weight: bold; color: #2e7d32; padding: 1px 0; border: none;">+{reward_diff:,.0f} Đ (Tổng nhận: {next_reward:,.0f} Đ)</td></tr>
         </table>
     </div>
     """
 else:
     kich_cau_html = """
-    <div style="background-color: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; border-radius: 6px; padding: 5px; text-align: center; font-weight: bold; font-size: 0.75rem; margin-top: 6px;">
+    <div style="background-color: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; border-radius: 6px; padding: 4px; text-align: center; font-weight: bold; font-size: 0.75rem; margin-top: 4px;">
         🏆 ĐÃ ĐẠT CẤP ĐỘ THƯỞNG CAO NHẤT (MỐC KỊCH TRẦN)!
     </div>
     """
 
 if after_reward == 0:
     status_html = f"""
-    <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.5;">
-        <div style="text-align: center; font-weight: bold; color: {time_color}; font-size: 0.9rem; margin-bottom: 6px; background-color: #ffeb3b; padding: 4px; border-radius: 4px;">{time_warning_text}</div>
-        <div style="text-align: center; font-weight: bold; color: #d32f2f; font-size: 0.8rem; margin-bottom: 6px;">⚠️ ĐƠN HÀNG CHƯA ĐỦ ĐỂ ĐẠT MỐC THƯỞNG NÀO</div>
+    <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 8px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.4;">
+        <div style="text-align: center; font-weight: bold; color: {time_color}; font-size: 0.85rem; margin-bottom: 4px; background-color: #ffeb3b; padding: 2px; border-radius: 4px;">{time_warning_text}</div>
+        <div style="text-align: center; font-weight: bold; color: #d32f2f; font-size: 0.8rem; margin-bottom: 4px;">⚠️ ĐƠN HÀNG CHƯA ĐỦ ĐỂ ĐẠT MỐC THƯỞNG NÀO</div>
         <table style="width:100%; border-collapse: collapse;">
-            <tr style="border-bottom: 1px solid #ffe0b2;"><td style="padding: 3px 0; font-size: 0.78rem; border: none;">🎯 <b>Mốc thưởng 1 cần đạt:</b></td><td style="text-align: right; font-weight: bold; color: #1565c0; font-size: 0.78rem; border: none;">{mocs[0]:,.0f} Đ</td></tr>
-            <tr style="border-bottom: 1px solid #ffe0b2;"><td style="padding: 3px 0; font-size: 0.78rem; border: none;">📉 <b>Còn thiếu để lấy tiền:</b></td><td style="text-align: right; font-weight: bold; color: #d32f2f; font-size: 0.78rem; border: none;">Thiếu {mocs[0] - total_revenue:,.0f} Đ</td></tr>
-            <tr><td style="padding: 3px 0; color: #666; font-size: 0.78rem; border: none;">🎁 Tiền thưởng mốc 1:</td><td style="text-align: right; color: #2e7d32; font-weight: bold; font-size: 0.78rem; border: none;">+{tiens[0]:,.0f} Đ</td></tr>
+            <tr style="border-bottom: 1px solid #ffe0b2;"><td style="padding: 2px 0; font-size: 0.78rem; border: none;">🎯 <b>Mốc thưởng 1 cần đạt:</b></td><td style="text-align: right; font-weight: bold; color: #1565c0; font-size: 0.78rem; border: none;">{mocs[0]:,.0f} Đ</td></tr>
+            <tr style="border-bottom: 1px solid #ffe0b2;"><td style="padding: 2px 0; font-size: 0.78rem; border: none;">📉 <b>Còn thiếu để lấy tiền:</b></td><td style="text-align: right; font-weight: bold; color: #d32f2f; font-size: 0.78rem; border: none;">Thiếu {mocs[0] - total_revenue:,.0f} Đ</td></tr>
+            <tr><td style="padding: 2px 0; color: #666; font-size: 0.78rem; border: none;">🎁 Tiền thưởng mốc 1:</td><td style="text-align: right; color: #2e7d32; font-weight: bold; font-size: 0.78rem; border: none;">+{tiens[0]:,.0f} Đ</td></tr>
         </table>
     </div>
     """
 else:
     status_html = f"""
-    <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.5;">
-        <div style="text-align: center; font-weight: bold; color: #1b5e20; font-size: 0.9rem; margin-bottom: 6px; background-color: #c8e6c9; padding: 4px; border-radius: 4px;">🎉 ĐÃ KHÓA THÀNH CÔNG MỐC THƯỞNG {after_level}</div>
-        <table style="width:100%; border-collapse: collapse; margin-bottom: 4px;">
-            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 2px 0; font-size: 0.78rem; border: none;">💰 <b>Tiền thưởng đút túi:</b></td><td style="text-align: right; font-weight: bold; color: #2e7d32; font-size: 0.85rem; border: none;">+{after_reward:,.0f} VNĐ</td></tr>
-            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 2px 0; font-size: 0.78rem; border: none;">🛒 Tổng tích lũy sau đơn:</td><td style="text-align: right; font-weight: bold; color: #333; border: none;">{total_revenue:,.0f} Đ</td></tr>
+    <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 8px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.4;">
+        <div style="text-align: center; font-weight: bold; color: #1b5e20; font-size: 0.85rem; margin-bottom: 4px; background-color: #c8e6c9; padding: 2px; border-radius: 4px;">🎉 ĐÃ KHÓA THÀNH CÔNG MỐC THƯỞNG {after_level}</div>
+        <table style="width:100%; border-collapse: collapse; margin-bottom: 2px;">
+            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 1px 0; font-size: 0.78rem; border: none;">💰 <b>Tiền thưởng đút túi:</b></td><td style="text-align: right; font-weight: bold; color: #2e7d32; font-size: 0.85rem; border: none;">+{after_reward:,.0f} VNĐ</td></tr>
+            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 1px 0; font-size: 0.78rem; border: none;">🛒 Tổng tích lũy sau đơn:</td><td style="text-align: right; font-weight: bold; color: #333; border: none;">{total_revenue:,.0f} Đ</td></tr>
             <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 2px 0; font-size: 0.78rem; color: #1565c0; border: none;">📉 Vốn thực tế của đơn hôm nay:</td><td style="text-align: right; font-weight: bold; color: #1565c0; border: none;">{max(0, today_order_value - (after_reward - curr_reward)):,.0f} Đ</td></tr>
         </table>
-        <div style="background-color: #1b5e20; color: white; border-radius: 4px; padding: 3px; text-align: center; font-weight: bold; font-size: 0.75rem; margin-bottom: 4px;">
+        <div style="background-color: #1b5e20; color: white; border-radius: 4px; padding: 2px; text-align: center; font-weight: bold; font-size: 0.75rem; margin-bottom: 2px;">
             🔥 ĐỒN BẨY GIẢM GIÁ NGẦM ĐƠN HÔM NAY: {effective_discount:.1f}%
         </div>
         {kich_cau_html}
