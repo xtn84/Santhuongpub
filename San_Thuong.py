@@ -8,7 +8,7 @@ st.set_page_config(page_title="Trợ Lý Săn Thưởng Lũy Tiến", layout="ce
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 1.0rem !important; padding-bottom: 0.4rem !important; }
+    .block-container { padding-top: 1.2rem !important; padding-bottom: 0.4rem !important; }
     div[data-testid="stVerticalBlock"] > div { padding-top: 0.05rem !important; padding-bottom: 0.05rem !important; }
     .section-title { font-size: 0.85rem !important; font-weight: bold; margin-top: 6px !important; margin-bottom: 2px !important; color: #444; }
     </style>
@@ -139,18 +139,12 @@ with col_s2:
 mocs = store_data["mocs"]
 tiens = store_data["tiens"]
 
-# Cập nhật giá trị khởi tạo chính xác: Mốc 1 là 5 triệu, Mốc 5 là 25 triệu (> 20 triệu)
 if selected_store == "[Tùy chỉnh nhập tay bên dưới]":
     st.markdown("<details><summary>🛠️ Cấu hình nhanh 5 mức thưởng (Nhấp để mở)</summary>", unsafe_allow_html=True)
-    default_mocs = [5000000, 10000000, 15000000, 20000000, 25000000]
-    default_tiens = [100000, 200000, 300000, 400000, 500000]
-    
     for i in range(1, 6):
         col1, col2 = st.columns(2)
-        with col1: 
-            mocs[i-1] = st.number_input(f"Mốc {i} (Đ):", min_value=0, value=default_mocs[i-1], step=500000)
-        with col2: 
-            tiens[i-1] = st.number_input(f"Tiền thưởng {i} (Đ):", min_value=0, value=default_tiens[i-1], step=50000)
+        with col1: mocs[i-1] = st.number_input(f"Mốc {i} (Đ):", min_value=0, value=i*5000000, step=500000)
+        with col2: tiens[i-1] = st.number_input(f"Tiền thưởng {i} (Đ):", min_value=0, value=i*100000, step=50000)
     st.markdown("</details>", unsafe_allow_html=True)
 
 # --- 🧠 LOGIC XỬ LÝ LŨY TIẾN ---
@@ -175,7 +169,7 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 KHỐI 1: BẢNG HTML CO HẸP DÒNG TUYỆT ĐỐI (Đã sửa lỗi hiển thị mốc 1 và mốc 5) ---
+# --- 📋 KHỐI 1: BẢNG CƠ CẤU HTML SIÊU SÁT NHAU (Padding = 1px, Đã sửa lỗi hiển thị) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
 table_rows_list = []
@@ -185,33 +179,29 @@ for i in range(5):
     row_weight = "bold" if is_next_target else "normal"
     target_star = "🎯 " if is_next_target else ""
     
-    # Định dạng hiển thị chuỗi doanh số, riêng mốc 5 thêm dấu ">" nếu giá trị là mặc định nhập tay công thức lớn hơn mốc 4
-    if i == 4:
-        moc_str = f"> {mocs[i]:,.0f} Đ"
-    else:
-        moc_str = f"{mocs[i]:,.0f} Đ"
-        
+    moc_str = f"{mocs[i]:,.0f} Đ"
     tien_str = f"+{tiens[i]:,.0f} Đ"
     
-    # Sử dụng padding siêu nhỏ 2px và line-height 1 để các dòng khít chặt vào nhau
+    # Sử dụng padding: 1px 4px để nén các dòng khít chặt lại với nhau tối đa
     row_html = f"""
-    <tr style="background-color: {row_bg}; font-weight: {row_weight}; line-height: 1;">
-        <td style="padding: 2px 4px; font-size: 0.75rem; color: #333; border: 1px solid #eeeeee;">{target_star}Mốc {i+1}</td>
-        <td style="padding: 2px 4px; text-align: right; font-size: 0.75rem; color: #1565c0; border: 1px solid #eeeeee;">{moc_str}</td>
-        <td style="padding: 2px 4px; text-align: right; font-size: 0.75rem; color: #2e7d32; border: 1px solid #eeeeee;">{tien_str}</td>
+    <tr style="background-color: {row_bg}; font-weight: {row_weight};">
+        <td style="padding: 1px 4px; font-size: 0.75rem; color: #333; border: 1px solid #eeeeee;">{target_star}Mốc {i+1}</td>
+        <td style="padding: 1px 4px; text-align: right; font-size: 0.75rem; color: #1565c0; border: 1px solid #eeeeee;">{moc_str}</td>
+        <td style="padding: 1px 4px; text-align: right; font-size: 0.75rem; color: #2e7d32; border: 1px solid #eeeeee;">{tien_str}</td>
     </tr>
     """
     table_rows_list.append(row_html)
 
 all_rows_content = "".join(table_rows_list)
 
+# Tạo chuỗi HTML hoàn chỉnh mà không sử dụng ký tự lồng biến, giúp tránh vỡ giao diện trên Streamlit
 full_table_html = f"""
-<table style="width:100%; border-collapse: collapse; font-family: sans-serif; margin-bottom: 2px;">
+<table style="width:100%; border-collapse: collapse; font-family: sans-serif; margin-bottom: 4px;">
     <thead>
-        <tr style="background-color: #f1f1f1; font-weight: bold; line-height: 1;">
-            <th style="padding: 3px 4px; font-size: 0.75rem; color: #444; text-align: left; border: 1px solid #dddddd;">Mốc</th>
-            <th style="padding: 3px 4px; text-align: right; font-size: 0.75rem; color: #444; border: 1px solid #dddddd;">Doanh số</th>
-            <th style="padding: 3px 4px; text-align: right; font-size: 0.75rem; color: #444; border: 1px solid #dddddd;">Thưởng</th>
+        <tr style="background-color: #f1f1f1; font-weight: bold;">
+            <th style="padding: 2px 4px; font-size: 0.75rem; color: #444; text-align: left; border: 1px solid #dddddd;">Mốc</th>
+            <th style="padding: 2px 4px; text-align: right; font-size: 0.75rem; color: #444; border: 1px solid #dddddd;">Doanh số</th>
+            <th style="padding: 2px 4px; text-align: right; font-size: 0.75rem; color: #444; border: 1px solid #dddddd;">Thưởng</th>
         </tr>
     </thead>
     <tbody>
