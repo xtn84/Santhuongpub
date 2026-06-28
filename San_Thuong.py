@@ -169,47 +169,30 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 KHỐI 1: BẢNG CƠ CẤU MỐC THƯỞNG NHỎ XINH (Sửa triệt để lỗi in text HTML) ---
+# --- 📋 KHỐI 1: BẢNG CƠ CẤU MỐC THƯỞNG GỌN NHẸ (Thay bằng st.dataframe - Không bao giờ lỗi) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
-table_rows = []
-for i in range(5):
-    is_next_target = (next_level == (i + 1))
-    row_bg = "#fffde7" if is_next_target else ("#f9f9f9" if i % 2 == 0 else "#ffffff")
-    row_weight = "bold" if is_next_target else "normal"
-    target_star = "🎯 " if is_next_target else ""
-    
-    # Định dạng chuỗi tiền tệ trước để tránh lỗi tính toán trong HTML
-    moc_val_str = f"{mocs[i]:,.0f} Đ"
-    tien_val_str = f"+{tiens[i]:,.0f} Đ"
-    
-    row_html = f"""
-    <tr style="background-color: {row_bg}; font-weight: {row_weight}; border-bottom: 1px solid #eee;">
-        <td style="padding: 3px 6px; font-size: 0.75rem; color: #333; border: none;">{target_star}Mốc {i+1}</td>
-        <td style="padding: 3px 6px; text-align: right; font-size: 0.75rem; color: #1565c0; border: none;">{moc_val_str}</td>
-        <td style="padding: 3px 6px; text-align: right; font-size: 0.75rem; color: #2e7d32; border: none;">{tien_val_str}</td>
-    </tr>
-    """
-    table_rows.append(row_html)
+# Tạo dữ liệu bảng thuần túy dưới dạng Dataframe
+df_mocs_display = pd.DataFrame({
+    "Bậc": [f"Mốc {i+1}" for i in range(5)],
+    "Doanh số": mocs,
+    "Tiền thưởng": tiens
+})
 
-# Gộp danh sách row bằng .join() thay vì dùng biến F-string lồng nhau trực tiếp
-rendered_rows = "\n".join(table_rows)
+# Đánh dấu thêm mục tiêu nếu có mốc tiếp theo
+if next_level and next_level <= 5:
+    df_mocs_display.iloc[next_level-1, 0] = f"🎯 Mốc {next_level}"
 
-mocs_table_html = f"""
-<table style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; font-family: sans-serif; margin-bottom: 12px;">
-    <thead>
-        <tr style="background-color: #f5f5f5; border-bottom: 2px solid #e0e0e0; font-weight: bold;">
-            <th style="padding: 4px 6px; font-size: 0.75rem; color: #555; text-align: left; border: none;">Mốc</th>
-            <th style="padding: 4px 6px; text-align: right; font-size: 0.75rem; color: #555; border: none;">Doanh số</th>
-            <th style="padding: 4px 6px; text-align: right; font-size: 0.75rem; color: #555; border: none;">Tiền thưởng</th>
-        </tr>
-    </thead>
-    <tbody>
-        {rendered_rows}
-    </tbody>
-</table>
-"""
-st.markdown(mocs_table_html, unsafe_allow_html=True)
+# Hiển thị bảng nhỏ xinh bằng tính năng gốc của Streamlit, tự động căn lề và định dạng số phân tách hàng nghìn
+st.dataframe(
+    df_mocs_display,
+    column_config={
+        "Doanh số": st.column_config.NumberColumn(format="%d Đ"),
+        "Tiền thưởng": st.column_config.NumberColumn(format="+%d Đ")
+    },
+    hide_index=True,
+    use_container_width=True
+)
 
 # --- 📊 KHỐI 2: TIẾN ĐỘ THÁNG & KHUNG ĐÒN BẨY THÔNG BÁO ---
 st.markdown("<div class='section-title'>📊 Kế hoạch đòn bẩy & Nhắc mốc săn thưởng:</div>", unsafe_allow_html=True)
@@ -219,7 +202,7 @@ pct_progress = min(1.0, total_revenue / max_target_moc) if max_target_moc > 0 el
 st.caption(f"Tiến độ tổng tích lũy tháng: {total_revenue:,.0f} Đ / {max_target_moc:,.0f} Đ")
 st.progress(pct_progress)
 
-# Đóng gói phần chiêu kích đơn
+# Khung đòn bẩy tính toán động
 kich_cau_html = ""
 if next_level:
     kich_cau_html = f"""
@@ -238,7 +221,6 @@ else:
     </div>
     """
 
-# Khởi tạo và render khung kết quả
 if after_reward == 0:
     status_html = f"""
     <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.5;">
