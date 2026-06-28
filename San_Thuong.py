@@ -8,7 +8,7 @@ st.set_page_config(page_title="Trợ Lý Săn Thưởng Lũy Tiến", layout="ce
 
 st.markdown("""
     <style>
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 0.4rem !important; }
+    .block-container { padding-top: 1.8rem !important; padding-bottom: 0.4rem !important; }
     div[data-testid="stVerticalBlock"] > div { padding-top: 0.1rem !important; padding-bottom: 0.1rem !important; }
     .section-title { font-size: 0.85rem !important; font-weight: bold; margin-top: 8px !important; margin-bottom: 4px !important; color: #444; }
     </style>
