@@ -109,36 +109,46 @@ if not df_sheet.empty:
 
     # 3. Chọn Nhân viên thuộc Office đã chọn
     df_filtered = df_filtered[df_filtered["Office"] == selected_office]
-    nv_list = sorted(df_filtered["Nhan_vien"].unique())
+    nv_list = sorted(df_filtered["IDnhanvien"].unique())
     selected_nv = st.selectbox("Chọn Nhân viên:", nv_list)
 
-    # 4. Chọn Tuyến thứ
-    df_filtered = df_filtered[df_filtered["Nhan_vien"] == selected_nv]
-    # Gộp Tuyến và Thứ lại hoặc hiển thị theo thiết kế file của bạn (ở đây hiển thị riêng biệt tùy chọn ghép chuỗi)
-    df_filtered["Tuyen_Thu"] = (
-        df_filtered["Tuyen"] + " - " + df_filtered["Thu"]
-    )
-    tuyen_thu_list = sorted(df_filtered["Tuyen_Thu"].unique())
-    selected_tuyen_thu = st.selectbox("Chọn Tuyến - Thứ:", tuyen_thu_list)
+    # 4. Chọn Tuyến thứ (Sử dụng trực tiếp cột đã có sẵn trong file)
+    df_filtered = df_filtered[df_filtered["IDnhanvien"] == selected_nv]
+    
+    # Tự động tìm tên cột Tuyến thứ (để tránh lỗi nếu ghi "Tuyến thứ" hoặc "Tuyen_thu" hoặc "Tuyen thu")
+    col_tuyen_thu = None
+    for c in df_filtered.columns:
+        if c.strip().lower() in ["tuyến thứ", "tuyen thu", "tuyen_thu"]:
+            col_tuyen_thu = c
+            break
+            
+    if col_tuyen_thu and col_tuyen_thu in df_filtered.columns:
+        tuyen_thu_list = sorted(df_filtered[col_tuyen_thu].dropna().unique())
+        selected_tuyen_thu = st.selectbox("Chọn Tuyến thứ:", tuyen_thu_list)
+        # Lọc tiếp dữ liệu theo Tuyến thứ đã chọn
+        df_filtered = df_filtered[df_filtered[col_tuyen_thu] == selected_tuyen_thu]
+    else:
+        # Dự phòng nếu không tìm thấy cột Tuyến thứ, thông báo để người dùng biết
+        st.warning("⚠️ Không tìm thấy cột 'Tuyến thứ' trong file Sheets!")
+        selected_tuyen_thu = st.selectbox("Chọn Tuyến thứ:", ["Mặc định"])
 
-    # 5. Chọn Khách hàng (Shop) thuộc tuyến đã lọc
-    df_filtered = df_filtered[df_filtered["Tuyen_Thu"] == selected_tuyen_thu]
-    shop_list = sorted(df_filtered["Shop"].unique())
+    # 5. Chọn Khách hàng (Shop) thuộc tuyến đã lọc ở trên
+    shop_list = sorted(df_filtered["Shop"].dropna().unique()) if "Shop" in df_filtered.columns else []
     shop_options = shop_list + ["[Tùy chỉnh nhập tay bên dưới]"]
 
-    st.markdown(
-        "<div class='section-title'>🏪 1. Chọn khách hàng ghé thăm:</div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<div class='section-title'>🏪 1. Chọn khách hàng ghé thăm:</div>", unsafe_allow_html=True)
     selected_store = st.selectbox("Danh sách shop đã lọc:", shop_options)
 
-    if selected_store != "[Tùy chỉnh nhập tay bên dưới]":
-        row_data = df_filtered[df_filtered["Shop"] == selected_store].iloc[0]
-        store_data = {
-            "luy_ke": int(row_data["Luy_ke"]),
-            "moc_thuong": int(row_data["Moc_thuong"]),
-            "tien_thuong": int(row_data["Tien_thuong"]),
-        }
+    if selected_store != "[Tùy chỉnh nhập tay bên dưới]" and not df_filtered.empty:
+        # Lấy dòng dữ liệu của Shop được chọn
+        df_shop = df_filtered[df_filtered["Shop"] == selected_store]
+        if not df_shop.empty:
+            row_data = df_shop.iloc[0]
+            store_data = {
+                "luy_ke": int(row_data.get("Luy_ke", 0)),
+                "moc_thuong": int(row_data.get("Moc_thuong", 0)),
+                "tien_thuong": int(row_data.get("Tien_thuong", 0))
+            }
 else:
     # Dự phòng hoàn toàn nếu lỗi Sheet
     st.warning("⚠️ Đang sử dụng chế độ Nhập tay do lỗi kết nối dữ liệu.")
