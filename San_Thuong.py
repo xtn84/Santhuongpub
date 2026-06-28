@@ -169,29 +169,29 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 KHỐI 1: BẢNG CƠ CẤU MỐC THƯỞNG SIÊU NÉN (Sử dụng st.data_editor thu nhỏ dòng) ---
+# --- 📋 KHỐI 1: BẢNG CƠ CẤU MỐC THƯỞNG GỌN NHẸ (Thay bằng st.dataframe - Không bao giờ lỗi) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
+# Tạo dữ liệu bảng thuần túy dưới dạng Dataframe
 df_mocs_display = pd.DataFrame({
     "Bậc": [f"Mốc {i+1}" for i in range(5)],
     "Doanh số": mocs,
     "Tiền thưởng": tiens
 })
 
+# Đánh dấu thêm mục tiêu nếu có mốc tiếp theo
 if next_level and next_level <= 5:
     df_mocs_display.iloc[next_level-1, 0] = f"🎯 Mốc {next_level}"
 
-# Dùng st.data_editor tích hợp sẵn tính năng row_height="compact" để ép các dòng khít chặt lại với nhau
-st.data_editor(
+# Hiển thị bảng nhỏ xinh bằng tính năng gốc của Streamlit, tự động căn lề và định dạng số phân tách hàng nghìn
+st.dataframe(
     df_mocs_display,
     column_config={
         "Doanh số": st.column_config.NumberColumn(format="%d Đ"),
         "Tiền thưởng": st.column_config.NumberColumn(format="+%d Đ")
     },
     hide_index=True,
-    use_container_width=True,
-    disabled=True,            # Khóa không cho sửa dữ liệu trên bảng hiển thị
-    row_height="compact"       # NÉN GỌN dòng nhỏ tối đa, không tốn diện tích cuộn
+    use_container_width=True
 )
 
 # --- 📊 KHỐI 2: TIẾN ĐỘ THÁNG & KHUNG ĐÒN BẨY THÔNG BÁO ---
