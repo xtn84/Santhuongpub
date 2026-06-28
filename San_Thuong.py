@@ -54,7 +54,7 @@ try:
     df_sheet = pd.read_csv(csv_url)
     df_sheet.columns = df_sheet.columns.str.strip()
     
-    # Chuẩn hóa cột ID nhân viên thành dạng chuỗi text thuần túy để tránh lỗi drop-down số
+    # Chuẩn hóa cột ID nhân viên thành dạng chuỗi text thuần túy
     if "IDnhanvien" in df_sheet.columns:
         df_sheet["IDnhanvien"] = df_sheet["IDnhanvien"].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
         
@@ -101,7 +101,6 @@ if not df_sheet.empty:
         selected_nv_id = st.selectbox("3. Chọn Mã nhân viên (ID):", nv_id_list)
         df_filtered = df_filtered[df_filtered["IDnhanvien"] == selected_nv_id]
         
-        # Hiển thị nhỏ tên nhân viên tương ứng bên dưới để Sales xác nhận nhanh
         if "Tên nhân viên" in df_filtered.columns and not df_filtered.empty:
             ten_nv_hien_tai = df_filtered["Tên nhân viên"].iloc[0]
             st.info(f"👨‍💼 Nhân viên: **{ten_nv_hien_tai}**")
@@ -140,7 +139,6 @@ with col_s1:
 with col_s2:
     today_order_value = st.number_input("Đơn hàng định chốt hôm nay (Đ):", min_value=0, value=500000, step=50000)
 
-# Khai báo mốc và tiền thưởng để tính toán
 mocs = store_data["mocs"]
 tiens = store_data["tiens"]
 
@@ -174,7 +172,39 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📊 HIỂN THỊ KẾT QUẢ ---
+# --- 📋 MỚI BỔ SUNG: BẢNG CƠ CẤU MỐC THƯỞNG CỦA SHOP ---
+st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
+
+table_rows = ""
+for i in range(5):
+    # Đánh dấu highlight dòng mốc thưởng tiếp theo mà nhân viên cần đạt tới
+    is_next_target = (next_level == (i + 1))
+    row_bg = "#fffde7" if is_next_target else ("#f9f9f9" if i % 2 == 0 else "#ffffff")
+    row_weight = "bold" if is_next_target else "normal"
+    target_star = "🎯 " if is_next_target else ""
+    
+    table_rows += f"""
+    <tr style="background-color: {row_bg}; font-weight: {row_weight}; border-bottom: 1px solid #e0e0e0;">
+        <td style="padding: 6px; font-size: 0.8rem; color: #333;">{target_star}Mốc {i+1}</td>
+        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #1565c0;">{mocs[i]:,.0f} Đ</td>
+        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #2e7d32;">+{tiens[i]:,.0f} Đ</td>
+    </tr>
+    """
+
+mocs_table_html = f"""
+<table style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; font-family: sans-serif; margin-bottom: 10px;">
+    <tr style="background-color: #f5f5f5; border-bottom: 2px solid #e0e0e0; font-weight: bold;">
+        <td style="padding: 6px; font-size: 0.8rem; color: #555;">Bậc thưởng</td>
+        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #555;">Doanh số yêu cầu</td>
+        <td style="padding: 6px; text-align: right; font-size: 0.8rem; color: #555;">Tiền thưởng nhận</td>
+    </tr>
+    {table_rows}
+</table>
+"""
+st.markdown(mocs_table_html, unsafe_allow_html=True)
+
+
+# --- 📊 HIỂN THỊ KẾT QUẢ ĐÒN BẨY & THÔNG BÁO ---
 st.markdown("<div class='section-title'>📊 Kế hoạch đòn bẩy & Nhắc mốc săn thưởng:</div>", unsafe_allow_html=True)
 
 max_target_moc = next_moc if next_moc else mocs[-1]
