@@ -1,27 +1,24 @@
+import streamlit as st
+import pandas as pd
 import datetime
 import calendar
-import pandas as pd
-import streamlit as st
 
 # 1. CẤU HÌNH MOBILE FIRST & NÉN KHÔNG GIAN
 st.set_page_config(page_title="Trợ Lý Săn Thưởng Lũy Tiến", layout="centered")
 
-st.markdown(
-    """
+st.markdown("""
     <style>
     .block-container { padding-top: 2.2rem !important; padding-bottom: 0.4rem !important; }
     div[data-testid="stVerticalBlock"] > div { padding-top: 0.1rem !important; padding-bottom: 0.1rem !important; }
     .section-title { font-size: 0.9rem !important; font-weight: bold; margin-top: 10px !important; margin-bottom: 4px !important; color: #555; }
     </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# 2. HỆ THỐNG BẢO MẬT: MẬT KHẨU TRUY CẬP (Theo phân cấp Văn phòng/Khu vực)
+# 2. HỆ THỐNG BẢO MẬT: MẬT KHẨU TRUY CẬP
 ALLOWED_PASSWORDS = {
     "orion@hn1": "Sales Hà Nội 1",
     "orion@hn2": "Sales Hà Nội 2",
-    "orion@ht1": "Sales Hà Tây 1",
+    "orion@ht1": "Sales Hà Tây 1"
 }
 
 if "logged_in" not in st.session_state:
@@ -44,208 +41,186 @@ now = datetime.datetime.now()
 current_day, current_month, current_year = now.day, now.month, now.year
 _, last_day = calendar.monthrange(current_year, current_month)
 remaining_days = last_day - current_day
-time_warning_text = (
-    "🚨 HÔM NAY LÀ NGÀY CUỐI CÙNG CHỐT SỐ THÁNG!"
-    if remaining_days == 0
-    else f"⏳ CHỈ CÒN ĐÚNG {remaining_days} NGÀY ĐỂ GIẬT THƯỞNG!"
-)
+time_warning_text = "🚨 HÔM NAY LÀ NGÀY CUỐI CÙNG CHỐT SỐ THÁNG!" if remaining_days == 0 else f"⏳ CHỈ CÒN ĐÚNG {remaining_days} NGÀY ĐỂ GIẬT THƯỞNG!"
 time_color = "#d32f2f" if remaining_days == 0 else "#e65100"
 
 # --- 📊 ĐỌC DATA TỰ ĐỘNG TỪ GOOGLE SHEETS ---
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1jDeehUfAtHBitdM4BpqKV-5VSzdJdsDYoWPZvG-1Gb4/edit?usp=sharing"
 
-# Chuẩn bị DataFrame trống để tránh lỗi biến chưa định nghĩa
 df_sheet = pd.DataFrame()
 
 try:
     csv_url = GOOGLE_SHEET_URL.replace("/edit?usp=sharing", "/export?format=csv")
     df_sheet = pd.read_csv(csv_url)
-
-    # Đảm bảo các cột phân cấp chuẩn hóa thành chuỗi text để tránh lỗi drop-down
-    required_cols = [
-        "Center",
-        "Office",
-        "IDnhanvien",
-        "Tên nhân viên",
-        "Tuyến thứ",
-        "Shop",
-        "Luy_ke",
-        "Moc_thuong",
-        "Tien_thuong",
-    ]
-    for col in required_cols:
+    df_sheet.columns = df_sheet.columns.str.strip()
+    
+    # Ép kiểu dữ liệu số cho các cột tính toán thưởng lũy tiến
+    mocs_cols = [f"Moc_thuong {i}" for i in range(1, 6)]
+    tiens_cols = [f"Tiền Thưởng mốc {i}" for i in range(1, 6)]
+    
+    for col in ["Luy_ke", "Tien_thuong"] + mocs_cols + tiens_cols:
         if col in df_sheet.columns:
-            if col in ["Luy_ke", "Moc_thuong", "Tien_thuong"]:
-                df_sheet[col] = pd.to_numeric(df_sheet[col]).fillna(0).astype(int)
-            else:
-                df_sheet[col] = df_sheet[col].astype(str).str.strip()
+            # Loại bỏ ký tự lạ nếu có (như dấu > ở mốc số 5) rồi chuyển thành số số học
+            df_sheet[col] = df_sheet[col].astype(str).str.replace(r'[^\d]', '', regex=True)
+            df_sheet[col] = pd.to_numeric(df_sheet[col]).fillna(0).astype(int)
+            
 except Exception as e:
-    st.error(f"⚠️ Không thể đồng bộ dữ liệu từ Google Sheet. Vui lòng kiểm tra lại cấu trúc cột!")
+    st.error(f"⚠️ Lỗi cấu trúc hoặc kết nối Google Sheet: {e}")
 
-# --- GIAO DIỆN CHÍNH ---
-st.subheader("🎯 TRỢ LÝ SỐ SĂN THƯỞNG")
-st.caption(
-    f"👤 Tài khoản: {st.session_state.user_name} | 📅 Kỳ báo cáo: Tháng {current_month}/{current_year}"
-)
+# --- GIAO DIỆN CHÍNH & BỘ LỌC ĐA CẤP ---
+st.subheader("🎯 TRỢ LÝ SỐ SĂN THƯỞNG LŨY TIẾN")
+st.caption(f"👤 Tuyến: {st.session_state.user_name} | 📅 Kỳ báo cáo: Tháng {current_month}/{current_year}")
 
-# Khởi tạo giá trị mặc định cho dữ liệu shop
-store_data = {"luy_ke": 0, "moc_thuong": 0, "tien_thuong": 0}
-selected_store = "[Tùy chỉnh nhập tay bên dưới]"
-
-st.markdown(
-    "<div class='section-title'>🏢 Phân cấp tuyến bán hàng:</div>",
-    unsafe_allow_html=True,
-)
+# Khởi tạo dữ liệu shop mặc định (chế độ nhập tay)
+store_data = {"luy_ke": 0, "mocs": [0]*5, "tiens": [0]*5}
 
 if not df_sheet.empty:
-    # 1. Chọn Center
-    center_list = sorted(df_sheet["Center"].unique())
-    selected_center = st.selectbox("Chọn Center:", center_list)
-
-    # 2. Chọn Office thuộc Center đã chọn
-    df_filtered = df_sheet[df_sheet["Center"] == selected_center]
-    office_list = sorted(df_filtered["Office"].unique())
-    selected_office = st.selectbox("Chọn Office:", office_list)
-
-    # 3. Chọn Nhân viên thuộc Office đã chọn
-    df_filtered = df_filtered[df_filtered["Office"] == selected_office]
-    nv_list = sorted(df_filtered["IDnhanvien"].unique())
-    selected_nv = st.selectbox("Chọn Nhân viên:", nv_list)
-
-    # 4. Chọn Tuyến thứ (Sử dụng trực tiếp cột đã có sẵn trong file)
-    df_filtered = df_filtered[df_filtered["IDnhanvien"] == selected_nv]
+    st.markdown("<div class='section-title'>🏢 Bộ lọc phân cấp tuyến:</div>", unsafe_allow_html=True)
     
-    # Tự động tìm tên cột Tuyến thứ (để tránh lỗi nếu ghi "Tuyến thứ" hoặc "Tuyen_thu" hoặc "Tuyen thu")
-    col_tuyen_thu = None
-    for c in df_filtered.columns:
-        if c.strip().lower() in ["tuyến thứ", "tuyen thu", "tuyen_thu"]:
-            col_tuyen_thu = c
-            break
-            
-    if col_tuyen_thu and col_tuyen_thu in df_filtered.columns:
-        tuyen_thu_list = sorted(df_filtered[col_tuyen_thu].dropna().unique())
-        selected_tuyen_thu = st.selectbox("Chọn Tuyến thứ:", tuyen_thu_list)
-        # Lọc tiếp dữ liệu theo Tuyến thứ đã chọn
-        df_filtered = df_filtered[df_filtered[col_tuyen_thu] == selected_tuyen_thu]
-    else:
-        # Dự phòng nếu không tìm thấy cột Tuyến thứ, thông báo để người dùng biết
-        st.warning("⚠️ Không tìm thấy cột 'Tuyến thứ' trong file Sheets!")
-        selected_tuyen_thu = st.selectbox("Chọn Tuyến thứ:", ["Mặc định"])
-
-    # 5. Chọn Khách hàng (Shop) thuộc tuyến đã lọc ở trên
-    shop_list = sorted(df_filtered["Shop"].dropna().unique()) if "Shop" in df_filtered.columns else []
+    # 1. Chọn Center
+    center_list = sorted(df_sheet["Center"].dropna().unique())
+    selected_center = st.selectbox("1. Chọn Center:", center_list)
+    df_filtered = df_sheet[df_sheet["Center"] == selected_center]
+    
+    # 2. Chọn Office
+    office_list = sorted(df_filtered["Office"].dropna().unique())
+    selected_office = st.selectbox("2. Chọn Office:", office_list)
+    df_filtered = df_filtered[df_filtered["Office"] == selected_office]
+    
+    # 3. Chọn Nhân viên (Dùng Tên nhân viên để hiển thị công thức trực quan)
+    nv_list = sorted(df_filtered["IDnhanvien"].dropna().unique())
+    selected_nv = st.selectbox("3. Chọn Nhân viên:", nv_list)
+    df_filtered = df_filtered[df_filtered["Tên nhân viên"] == selected_nv]
+    
+    # 4. Chọn Tuyến thứ (Lấy trực tiếp từ cột "Tuyến thứ" trong file)
+    tuyen_thu_list = sorted(df_filtered["Tuyến thứ"].dropna().unique())
+    selected_tuyen_thu = st.selectbox("4. Chọn Tuyến thứ:", tuyen_thu_list)
+    df_filtered = df_filtered[df_filtered["Tuyến thứ"] == selected_tuyen_thu]
+    
+    # 5. Chọn Shop
+    shop_list = sorted(df_filtered["Shop"].dropna().unique())
     shop_options = shop_list + ["[Tùy chỉnh nhập tay bên dưới]"]
-
-    st.markdown("<div class='section-title'>🏪 1. Chọn khách hàng ghé thăm:</div>", unsafe_allow_html=True)
-    selected_store = st.selectbox("Danh sách shop đã lọc:", shop_options)
-
+    
+    st.markdown("<div class='section-title'>🏪 Chọn khách hàng ghé thăm:</div>", unsafe_allow_html=True)
+    selected_store = st.selectbox("Danh sách shop đã lọc theo tuyến:", shop_options)
+    
     if selected_store != "[Tùy chỉnh nhập tay bên dưới]" and not df_filtered.empty:
-        # Lấy dòng dữ liệu của Shop được chọn
-        df_shop = df_filtered[df_filtered["Shop"] == selected_store]
-        if not df_shop.empty:
-            row_data = df_shop.iloc[0]
-            store_data = {
-                "luy_ke": int(row_data.get("Luy_ke", 0)),
-                "moc_thuong": int(row_data.get("Moc_thuong", 0)),
-                "tien_thuong": int(row_data.get("Tien_thuong", 0))
-            }
+        row = df_filtered[df_filtered["Shop"] == selected_store].iloc[0]
+        store_data = {
+            "luy_ke": int(row["Luy_ke"]),
+            "mocs": [int(row[f"Moc_thuong {i}"]) for i in range(1, 6)],
+            "tiens": [int(row[f"Tiền Thưởng mốc {i}"]) for i in range(1, 6)]
+        }
 else:
-    # Dự phòng hoàn toàn nếu lỗi Sheet
-    st.warning("⚠️ Đang sử dụng chế độ Nhập tay do lỗi kết nối dữ liệu.")
-    selected_store = st.selectbox(
-        "Danh sách shop:", ["[Tùy chỉnh nhập tay bên dưới]"]
-    )
+    selected_store = "[Tùy chỉnh nhập tay bên dưới]"
 
-# Giao diện hiển thị/nhập số liệu doanh số
+# Giao diện nhập thông số đơn hàng
 col_s1, col_s2 = st.columns(2)
 with col_s1:
-    current_accumulated = st.number_input(
-        "Doanh số đã mua lũy kế (Đ):",
-        min_value=0,
-        value=store_data["luy_ke"],
-        step=100000,
-    )
+    current_accumulated = st.number_input("Doanh số đã mua lũy kế (Đ):", min_value=0, value=store_data["luy_ke"], step=100000)
 with col_s2:
-    target_threshold = st.number_input(
-        "Mốc doanh số ăn thưởng (Đ):",
-        min_value=0,
-        value=store_data["moc_thuong"],
-        step=100000,
-    )
+    today_order_value = st.number_input("Đơn hàng định chốt hôm nay (Đ):", min_value=0, value=500000, step=50000)
 
-reward_money = st.number_input(
-    "Tiền thưởng công ty trả khi đạt mốc (Đ):",
-    min_value=0,
-    value=store_data["tien_thuong"],
-    step=50000,
-)
+# Nhập mốc thủ công nếu chọn chế độ Nhập tay
+mocs = store_data["mocs"]
+tiens = store_data["tiens"]
+if selected_store == "[Tùy chỉnh nhập tay bên dưới]":
+    st.markdown("<details><summary>🛠️ Cấu hình nhanh 5 mức thưởng (Nhấp để mở)</summary>", unsafe_allow_html=True)
+    for i in range(1, 6):
+        col1, col2 = st.columns(2)
+        with col1: mocs[i-1] = st.number_input(f"Mốc {i} (Đ):", min_value=0, value=i*5000000, step=500000)
+        with col2: tiens[i-1] = st.number_input(f"Tiền thưởng {i} (Đ):", min_value=0, value=i*100000, step=50000)
+    st.markdown("</details>", unsafe_allow_html=True)
 
-st.markdown(
-    "<div class='section-title'>🛒 2. Đơn hàng thương lượng hôm nay:</div>",
-    unsafe_allow_html=True,
-)
-today_order_value = st.number_input(
-    "Giá trị đơn hàng định chốt (Đ):", min_value=0, value=500000, step=50000
-)
+# --- 🧠 LOGIC XỬ LÝ LŨY TIẾN THÔNG MINH ---
+total_revenue = current_accumulated + today_order_value
 
-# XỬ LÝ LOGIC SỐ LIỆU
-gap_before = max(0, target_threshold - current_accumulated)
-total_after_order = current_accumulated + today_order_value
-gap_after = max(0, target_threshold - total_after_order)
-pct_before = (
-    min(1.0, current_accumulated / target_threshold)
-    if target_threshold > 0
-    else 0.0
-)
-pct_after = (
-    min(1.0, total_after_order / target_threshold) if target_threshold > 0 else 0.0
-)
-is_unlocked = total_after_order >= target_threshold
-effective_discount_pct = (
-    (reward_money / today_order_value) * 100
-    if (is_unlocked and today_order_value > 0)
-    else 0.0
-)
+# Hàm tìm mốc hiện tại và mốc tiếp theo dựa trên doanh số nhập vào
+def evaluate_reward(revenue, mocs, tiens):
+    current_idx = -1  # Chưa đạt mốc nào
+    for i in range(len(mocs)):
+        if revenue >= mocs[i] and mocs[i] > 0:
+            current_idx = i
+            
+    next_idx = current_idx + 1 if current_idx < len(mocs) - 1 else None
+    
+    cur_moc_val = mocs[current_idx] if current_idx >= 0 else 0
+    cur_reward = tiens[current_idx] if current_idx >= 0 else 0
+    
+    next_moc_val = mocs[next_idx] if next_idx is not None else None
+    next_reward = tiens[next_idx] if next_idx is not None else None
+    
+    return current_idx + 1, cur_moc_val, cur_reward, next_idx + 1 if next_idx else None, next_moc_val, next_reward
 
-st.markdown(
-    "<div class='section-title'>📊 3. Biểu đồ tiến độ & Đòn bẩy chốt đơn:</div>",
-    unsafe_allow_html=True,
-)
-st.caption(
-    f"Tiến độ hiện tại: {pct_before*100:.1f}% ➡️ Sau đơn hôm nay: {pct_after*100:.1f}%"
-)
-st.progress(pct_after)
+# Đánh giá trạng thái Hiện tại (Trước đơn hôm nay) và Sau đơn hàng
+curr_level, _, curr_reward, _, _, _ = evaluate_reward(current_accumulated, mocs, tiens)
+after_level, after_moc, after_reward, next_level, next_moc, next_reward = evaluate_reward(total_revenue, mocs, tiens)
 
-if not is_unlocked:
+# Tính toán các chỉ số đòn bẩy
+gap_to_next = (next_moc - total_revenue) if next_moc else 0
+reward_diff = (next_reward - after_reward) if next_reward else 0
+effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
+
+# --- 📊 HIỂN THỊ KẾT QUẢ TRỰC QUAN ---
+st.markdown("<div class='section-title'>📊 Kế hoạch đòn bẩy & Nhắc mốc săn thưởng:</div>", unsafe_allow_html=True)
+
+# Thanh tiến độ trực quan lấy theo mốc cao nhất đang hướng tới
+max_target_moc = next_moc if next_moc else mocs[-1]
+pct_progress = min(1.0, total_revenue / max_target_moc) if max_target_moc > 0 else 0.0
+st.caption(f"Tiến độ tổng tích lũy tháng: {total_revenue:,.0f} Đ / {max_target_moc:,.0f} Đ")
+st.progress(pct_progress)
+
+# Hiển thị cấu trúc HTML phản hồi Real-time sinh động cho Sales chào hàng
+if after_reward == 0:
+    # Trường hợp chưa đạt mốc nào cả
     status_html = f"""
-    <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.4;">
-        <div style="text-align: center; font-weight: bold; color: {time_color}; font-size: 0.95rem; margin-bottom: 8px; background-color: #ffeb3b; padding: 4px; border-radius: 4px;">{time_warning_text}</div>
-        <div style="text-align: center; font-weight: bold; color: #e65100; font-size: 0.85rem; margin-bottom: 6px; border-top: 1px dashed #ffd180; padding-top: 6px;">⚠️ CỬA HÀNG CHƯA ĐỦ ĐỂ ĂN THƯỞNG</div>
-        <table style="width:100%; border-collapse: collapse; font-size: 0.8rem;">
-            <tr style="border-bottom: 1px solid #ffd180;"><td style="padding: 4px 0;">📉 <strong>Khoảng cách mốc thưởng:</strong></td><td style="text-align: right; font-weight: bold; color: #d32f2f;">Còn thiếu {gap_before:,.0f} Đ</td></tr>
-            <tr style="border-bottom: 1px solid #ffd180;"><td style="padding: 4px 0;">📦 <strong>Nhiệm vụ đơn hôm nay:</strong></td><td style="text-align: right; font-weight: bold; color: #1565c0;">Nâng đơn lên {gap_before:,.0f} Đ để chốt</td></tr>
-            <tr><td style="padding: 4px 0; color: #666;">🎁 Tiền thưởng của shop đang treo:</td><td style="text-align: right; color: #666; font-weight: bold;">{reward_money:,.0f} Đ</td></tr>
+    <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.82rem; line-height: 1.5;">
+        <div style="text-align: center; font-weight: bold; color: {time_color}; font-size: 0.95rem; margin-bottom: 6px; background-color: #ffeb3b; padding: 4px; border-radius: 4px;">{time_warning_text}</div>
+        <div style="text-align: center; font-weight: bold; color: #d32f2f; font-size: 0.85rem; margin-bottom: 6px;">⚠️ ĐƠN HÀNG CHƯA ĐỦ ĐỂ ĐẠT MỐC THƯỞNG NÀO</div>
+        <table style="width:100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #ffe0b2;"><td style="padding: 4px 0;">🎯 <b>Mốc thưởng 1 cần đạt:</b></td><td style="text-align: right; font-weight: bold; color: #1565c0;">{mocs[0]:,.0f} Đ</td></tr>
+            <tr style="border-bottom: 1px solid #ffe0b2;"><td style="padding: 4px 0;">📉 <b>Còn thiếu để lấy tiền:</b></td><td style="text-align: right; font-weight: bold; color: #d32f2f;">Thiếu {mocs[0] - total_revenue:,.0f} Đ</td></tr>
+            <tr><td style="padding: 4px 0; color: #666;">🎁 Tiền thưởng mốc 1:</td><td style="text-align: right; color: #2e7d32; font-weight: bold;">+{tiens[0]:,.0f} Đ</td></tr>
         </table>
     </div>
     """
 else:
+    # Trường hợp đã ăn được ít nhất 1 mốc và đang ở giữa các mốc tiếp theo
     status_html = f"""
-    <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.4;">
-        <div style="text-align: center; font-weight: bold; color: #2e7d32; font-size: 0.8rem; margin-bottom: 6px; background-color: #c8e6c9; border-radius: 4px; padding: 2px;">{time_warning_text}</div>
-        <div style="text-align: center; font-weight: bold; color: #1b5e20; font-size: 1rem; margin-bottom: 4px;">🎉 CHÚC MỪNG CHỊ! ĐÃ CÁN MỐC ĂN THƯỞNG</div>
-        <table style="width:100%; border-collapse: collapse; font-size: 0.78rem; margin-bottom: 6px;">
-            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">💰 <strong>Tiền thưởng đút túi:</strong></td><td style="text-align: right; font-weight: bold; color: #2e7d32; font-size: 0.9rem;">+{reward_money:,.0f} VNĐ</td></tr>
-            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">🛒 Giá trị đơn lấy hôm nay:</td><td style="text-align: right; font-weight: bold; color: #333;">{today_order_value:,.0f} Đ</td></tr>
-            <tr><td style="padding: 3px 0; color: #1565c0;">📉 <strong>Vốn thực tế sau trừ thưởng:</strong></td><td style="text-align: right; font-weight: bold; color: #1565c0; font-size: 0.9rem;">{(today_order_value - reward_money):,.0f} Đ</td></tr>
+    <div style="background-color: #e8f5e9; border: 1px solid #c8e6c9; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.82rem; line-height: 1.5;">
+        <div style="text-align: center; font-weight: bold; color: #1b5e20; font-size: 0.95rem; margin-bottom: 6px; background-color: #c8e6c9; padding: 4px; border-radius: 4px;">🎉 ĐÃ KHÓA THÀNH CÔNG MỐC THƯỞNG {after_level}</div>
+        <table style="width:100%; border-collapse: collapse; margin-bottom: 6px;">
+            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">💰 <b>Tiền thưởng đút túi:</b></td><td style="text-align: right; font-weight: bold; color: #2e7d32; font-size: 0.95rem;">+{after_reward:,.0f} VNĐ</td></tr>
+            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0;">🛒 Tổng tích lũy sau đơn:</td><td style="text-align: right; font-weight: bold; color: #333;">{total_revenue:,.0f} Đ</td></tr>
+            <tr style="border-bottom: 1px solid #c8e6c9;"><td style="padding: 3px 0; color: #1565c0;">📉 Vốn thực tế của đơn hôm nay:</td><td style="text-align: right; font-weight: bold; color: #1565c0;">{max(0, today_order_value - (after_reward - curr_reward)):,.0f} Đ</td></tr>
         </table>
-        <div style="background-color: #1b5e20; color: white; border-radius: 6px; padding: 6px; text-align: center; font-weight: bold; font-size: 0.85rem; margin-top: 4px;">
-            🔥 ĐƠN HÔM NAY GIẢM GIÁ NGẦM: {effective_discount_pct:.1f}%
+        <div style="background-color: #1b5e20; color: white; border-radius: 5px; padding: 4px; text-align: center; font-weight: bold; font-size: 0.8rem; margin-bottom: 8px;">
+            🔥 ĐỒN BẨY GIẢM GIÁ NGẦM ĐƠN HÔM NAY: {effective_discount:.1f}%
         </div>
-    </div>
     """
+    
+    # Nếu còn mốc cao hơn ở phía trước thì hiển thị lời nhắc kích số (Kịch trần mốc 5 sẽ ẩn)
+    if next_level:
+        status_html += f"""
+        <div style="background-color: #fffde7; border: 1px solid #fff59d; border-radius: 6px; padding: 8px; margin-top: 5px;">
+            <div style="color: #f57f17; font-weight: bold; text-align: center; margin-bottom: 4px; font-size: 0.85rem;">🚀 CHIÊU KÍCH ĐƠN: LÊN MỐC {next_level}</div>
+            <table style="width:100%; font-size: 0.78rem;">
+                <tr><td style="color:#555;">➕ Chỉ cần cố thêm:</td><td style="text-align: right; font-weight: bold; color: #d32f2f;">{gap_to_next:,.0f} Đ nữa</td></tr>
+                <tr><td style="color:#555;">🎁 Tiền thưởng tăng thêm:</td><td style="text-align: right; font-weight: bold; color: #2e7d32;">+{reward_diff:,.0f} Đ (Tổng nhận: {next_reward:,.0f} Đ)</td></tr>
+            </table>
+        </div>
+        """
+    else:
+        status_html += """
+        <div style="background-color: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; border-radius: 6px; padding: 6px; text-align: center; font-weight: bold; font-size: 0.8rem; margin-top: 5px;">
+            🏆 ĐÃ ĐẠT CẤP ĐỘ THƯỞNG CAO NHẤT (MỐC KỊCH TRẦN)!
+        </div>
+        """
+    status_html += "</div>"
 
 st.markdown(status_html, unsafe_allow_html=True)
 
+# Nút Đăng xuất
 st.write("")
 if st.button("Đăng xuất ✖️", use_container_width=True):
     st.session_state.logged_in = False
