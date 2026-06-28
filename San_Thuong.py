@@ -139,10 +139,9 @@ with col_s2:
 mocs = store_data["mocs"]
 tiens = store_data["tiens"]
 
-# Sửa giá trị khởi tạo mặc định khi chọn Nhập tay
+# Cập nhật giá trị khởi tạo chính xác: Mốc 1 là 5 triệu, Mốc 5 là 25 triệu (> 20 triệu)
 if selected_store == "[Tùy chỉnh nhập tay bên dưới]":
     st.markdown("<details><summary>🛠️ Cấu hình nhanh 5 mức thưởng (Nhấp để mở)</summary>", unsafe_allow_html=True)
-    # Quy định mặc định cụ thể cho từng mốc để tránh nhân chuỗi sai lệch mốc 4 và mốc 5
     default_mocs = [5000000, 10000000, 15000000, 20000000, 25000000]
     default_tiens = [100000, 200000, 300000, 400000, 500000]
     
@@ -176,7 +175,7 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 KHỐI 1: BẢNG HTML CO HẸP DÒNG TUYỆT ĐỐI (Padding 2px, line-height 1) ---
+# --- 📋 KHỐI 1: BẢNG HTML CO HẸP DÒNG TUYỆT ĐỐI (Đã sửa lỗi hiển thị mốc 1 và mốc 5) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
 table_rows_list = []
@@ -186,10 +185,15 @@ for i in range(5):
     row_weight = "bold" if is_next_target else "normal"
     target_star = "🎯 " if is_next_target else ""
     
-    moc_str = f"{mocs[i]:,.0f} Đ"
+    # Định dạng hiển thị chuỗi doanh số, riêng mốc 5 thêm dấu ">" nếu giá trị là mặc định nhập tay công thức lớn hơn mốc 4
+    if i == 4:
+        moc_str = f"> {mocs[i]:,.0f} Đ"
+    else:
+        moc_str = f"{mocs[i]:,.0f} Đ"
+        
     tien_str = f"+{tiens[i]:,.0f} Đ"
     
-    # Thêm line-height: 1 và giảm tối đa khoảng cách dòng tr
+    # Sử dụng padding siêu nhỏ 2px và line-height 1 để các dòng khít chặt vào nhau
     row_html = f"""
     <tr style="background-color: {row_bg}; font-weight: {row_weight}; line-height: 1;">
         <td style="padding: 2px 4px; font-size: 0.75rem; color: #333; border: 1px solid #eeeeee;">{target_star}Mốc {i+1}</td>
