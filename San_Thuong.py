@@ -92,7 +92,7 @@ if not df_sheet.empty:
         selected_office = st.selectbox("2. Chọn Office:", office_list)
         df_filtered = df_filtered[df_filtered["Office"] == selected_office]
         
-    # 3. Chọn Nhân viên (Lọc chuẩn theo IDnhanvien)
+    # 3. Chọn Nhân viên
     if "IDnhanvien" in df_filtered.columns:
         nv_id_list = sorted(df_filtered["IDnhanvien"].dropna().unique())
         selected_nv_id = st.selectbox("3. Chọn Mã nhân viên (ID):", nv_id_list)
@@ -169,23 +169,31 @@ gap_to_next = (next_moc - total_revenue) if next_moc else 0
 reward_diff = (next_reward - after_reward) if next_reward else 0
 effective_discount = (after_reward / today_order_value * 100) if (today_order_value > 0 and after_reward > 0) else 0.0
 
-# --- 📋 KHỐI 1: RENDERING BẢNG CƠ CẤU MỐC THƯỞNG NHỎ XINH (Tách biệt hoàn toàn) ---
+# --- 📋 KHỐI 1: BẢNG CƠ CẤU MỐC THƯỞNG NHỎ XINH (Sửa triệt để lỗi in text HTML) ---
 st.markdown("<div class='section-title'>📋 Bảng cơ cấu mốc thưởng áp dụng cho Shop:</div>", unsafe_allow_html=True)
 
-table_rows = ""
+table_rows = []
 for i in range(5):
     is_next_target = (next_level == (i + 1))
     row_bg = "#fffde7" if is_next_target else ("#f9f9f9" if i % 2 == 0 else "#ffffff")
     row_weight = "bold" if is_next_target else "normal"
     target_star = "🎯 " if is_next_target else ""
     
-    table_rows += f"""
+    # Định dạng chuỗi tiền tệ trước để tránh lỗi tính toán trong HTML
+    moc_val_str = f"{mocs[i]:,.0f} Đ"
+    tien_val_str = f"+{tiens[i]:,.0f} Đ"
+    
+    row_html = f"""
     <tr style="background-color: {row_bg}; font-weight: {row_weight}; border-bottom: 1px solid #eee;">
         <td style="padding: 3px 6px; font-size: 0.75rem; color: #333; border: none;">{target_star}Mốc {i+1}</td>
-        <td style="padding: 3px 6px; text-align: right; font-size: 0.75rem; color: #1565c0; border: none;">{mocs[i]:,.0f} Đ</td>
-        <td style="padding: 3px 6px; text-align: right; font-size: 0.75rem; color: #2e7d32; border: none;">+{tiens[i]:,.0f} Đ</td>
+        <td style="padding: 3px 6px; text-align: right; font-size: 0.75rem; color: #1565c0; border: none;">{moc_val_str}</td>
+        <td style="padding: 3px 6px; text-align: right; font-size: 0.75rem; color: #2e7d32; border: none;">{tien_val_str}</td>
     </tr>
     """
+    table_rows.append(row_html)
+
+# Gộp danh sách row bằng .join() thay vì dùng biến F-string lồng nhau trực tiếp
+rendered_rows = "\n".join(table_rows)
 
 mocs_table_html = f"""
 <table style="width:100%; border-collapse: collapse; border: 1px solid #e0e0e0; font-family: sans-serif; margin-bottom: 12px;">
@@ -197,13 +205,13 @@ mocs_table_html = f"""
         </tr>
     </thead>
     <tbody>
-        {table_rows}
+        {rendered_rows}
     </tbody>
 </table>
 """
 st.markdown(mocs_table_html, unsafe_allow_html=True)
 
-# --- 📊 KHỐI 2: RENDERING TIẾN ĐỘ & KẾ HOẠCH ĐÒN BẨY ---
+# --- 📊 KHỐI 2: TIẾN ĐỘ THÁNG & KHUNG ĐÒN BẨY THÔNG BÁO ---
 st.markdown("<div class='section-title'>📊 Kế hoạch đòn bẩy & Nhắc mốc săn thưởng:</div>", unsafe_allow_html=True)
 
 max_target_moc = next_moc if next_moc else mocs[-1]
@@ -211,7 +219,7 @@ pct_progress = min(1.0, total_revenue / max_target_moc) if max_target_moc > 0 el
 st.caption(f"Tiến độ tổng tích lũy tháng: {total_revenue:,.0f} Đ / {max_target_moc:,.0f} Đ")
 st.progress(pct_progress)
 
-# Tính toán các đoạn HTML động để tránh lồng nhau gây lỗi biến text văn bản
+# Đóng gói phần chiêu kích đơn
 kich_cau_html = ""
 if next_level:
     kich_cau_html = f"""
@@ -230,6 +238,7 @@ else:
     </div>
     """
 
+# Khởi tạo và render khung kết quả
 if after_reward == 0:
     status_html = f"""
     <div style="background-color: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 10px; font-family: sans-serif; font-size: 0.8rem; line-height: 1.5;">
